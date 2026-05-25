@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react"
 type Priority = "high" | "medium" | "low"
 type Category = "work" | "private" | "other"
 type FilterCategory = "all" | Category
+type FilterPriority = "all" | Priority
 
 type Todo = {
   id: string
@@ -70,6 +71,7 @@ export default function TodoApp() {
   const [deadline, setDeadline] = useState("")
   const [category, setCategory] = useState<Category>("work")
   const [filter, setFilter] = useState<FilterCategory>("all")
+  const [priorityFilter, setPriorityFilter] = useState<FilterPriority>("all")
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
   const [newId, setNewId] = useState<string | null>(null)
   const [poppingId, setPoppingId] = useState<string | null>(null)
@@ -109,7 +111,11 @@ export default function TodoApp() {
     }, 220)
   }
 
-  const filtered = filter === "all" ? todos : todos.filter(t => t.category === filter)
+  const filtered = todos.filter(t => {
+    if (filter !== "all" && t.category !== filter) return false
+    if (priorityFilter !== "all" && t.priority !== priorityFilter) return false
+    return true
+  })
   const sorted = [...filtered].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1
     const order: Record<Priority, number> = { high: 0, medium: 1, low: 2 }
@@ -153,21 +159,98 @@ export default function TodoApp() {
           </div>
         </div>
 
-        {/* カテゴリフィルタータブ */}
-        <div className="flex gap-2 flex-wrap">
-          {(["all", "work", "private", "other"] as const).map(cat => (
-            <button
-              key={cat}
-              onClick={() => setFilter(cat)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                filter === cat
+        {/* フィルターパネル */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-emerald-100 space-y-3">
+          {/* カテゴリフィルター */}
+          <div>
+            <p className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">カテゴリ</p>
+            <div className="flex gap-2 flex-wrap">
+              {(["all", "work", "private", "other"] as const).map(cat => {
+                const count = cat === "all"
+                  ? todos.filter(t => priorityFilter === "all" || t.priority === priorityFilter).length
+                  : todos.filter(t => t.category === cat && (priorityFilter === "all" || t.priority === priorityFilter)).length
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setFilter(cat)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                      filter === cat
+                        ? "bg-emerald-500 text-white shadow-sm scale-105"
+                        : "bg-slate-50 text-slate-500 border border-slate-200 hover:border-emerald-300 hover:text-emerald-600"
+                    }`}
+                  >
+                    <span>{cat === "all" ? "すべて" : `${CATEGORY_ICON[cat]} ${CATEGORY_LABEL[cat]}`}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                      filter === cat ? "bg-white/30 text-white" : "bg-slate-200 text-slate-400"
+                    }`}>{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* 優先度フィルター */}
+          <div>
+            <p className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">優先度</p>
+            <div className="flex gap-2 flex-wrap">
+              {(["all", "high", "medium", "low"] as const).map(p => {
+                const priorityIcon = p === "high" ? "🔴" : p === "medium" ? "🟡" : "🟢"
+                const priorityLabel = p === "all" ? "すべて" : PRIORITY_LABEL[p]
+                const count = p === "all"
+                  ? todos.filter(t => filter === "all" || t.category === filter).length
+                  : todos.filter(t => t.priority === p && (filter === "all" || t.category === filter)).length
+                const activeColor = p === "high"
+                  ? "bg-red-500 text-white shadow-sm scale-105"
+                  : p === "medium"
+                  ? "bg-amber-500 text-white shadow-sm scale-105"
+                  : p === "low"
                   ? "bg-emerald-500 text-white shadow-sm scale-105"
-                  : "bg-white text-slate-500 border border-slate-200 hover:border-emerald-300 hover:text-emerald-600"
-              }`}
-            >
-              {cat === "all" ? "すべて" : `${CATEGORY_ICON[cat]} ${CATEGORY_LABEL[cat]}`}
-            </button>
-          ))}
+                  : "bg-emerald-500 text-white shadow-sm scale-105"
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setPriorityFilter(p)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                      priorityFilter === p
+                        ? activeColor
+                        : "bg-slate-50 text-slate-500 border border-slate-200 hover:border-emerald-300 hover:text-emerald-600"
+                    }`}
+                  >
+                    <span>{p === "all" ? "すべて" : `${priorityIcon} ${priorityLabel}`}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                      priorityFilter === p ? "bg-white/30 text-white" : "bg-slate-200 text-slate-400"
+                    }`}>{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* アクティブフィルター表示 */}
+          {(filter !== "all" || priorityFilter !== "all") && (
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <span>フィルター中:</span>
+                {filter !== "all" && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 font-medium">
+                    {CATEGORY_ICON[filter]} {CATEGORY_LABEL[filter]}
+                  </span>
+                )}
+                {priorityFilter !== "all" && (
+                  <span className={`px-2 py-0.5 rounded-full font-medium border ${PRIORITY_COLOR[priorityFilter]}`}>
+                    {PRIORITY_LABEL[priorityFilter]}優先度
+                  </span>
+                )}
+                <span className="text-slate-300">({sorted.length}件)</span>
+              </div>
+              <button
+                onClick={() => { setFilter("all"); setPriorityFilter("all") }}
+                className="text-xs text-slate-400 hover:text-red-400 transition-colors underline underline-offset-2"
+              >
+                クリア
+              </button>
+            </div>
+          )}
         </div>
 
         {/* タスク追加フォーム */}
@@ -223,7 +306,9 @@ export default function TodoApp() {
         <ul className="space-y-2">
           {sorted.length === 0 && (
             <li className="text-center text-slate-300 text-sm py-12">
-              {filter === "all" ? "タスクを追加してみましょう" : "このカテゴリにタスクがありません"}
+              {filter === "all" && priorityFilter === "all"
+                ? "タスクを追加してみましょう"
+                : "条件に一致するタスクがありません"}
             </li>
           )}
           {sorted.map(todo => (
